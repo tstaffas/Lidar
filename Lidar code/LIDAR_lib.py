@@ -190,11 +190,12 @@ def save_all_pixels(histogram,file, dimX, dimY, binsize = 16):
     
 def save_data(d_data, file, name):
     #Saves the X,Y,Z data in a text file
-    Xdata , Ydata, Zdata = [], [], []
+
+    x, y, z = [], [], []
     for p in d_data:
-        Xdata.append(p[0])
-        Ydata.append(p[1])
-        Zdata.append(d_data[p])
+        x.append(p[0])
+        y.append(p[1])
+        z.append(d_data[p])
         
     #Saves the data
     if not os.path.exists(file.parent.joinpath(f'3d data')): #If folder does not exist, create it
@@ -202,9 +203,32 @@ def save_data(d_data, file, name):
     
     filename = name+file.stem
     savepath = file.parent.joinpath(f'3d data', filename + '.txt')
-    np.savetxt(savepath,np.transpose([Xdata,Ydata,Zdata]))
+    np.savetxt(savepath,np.transpose([x,y,z]))
 
+def save_intensity_data(d_data, i_data, file, name):
+    
+    x, y, z, I = [], [], [], []
+    for p in d_data:
+        x.append(p[0])
+        y.append(p[1])
+        z.append(d_data[p])
+        I.append(i_data[p])
+        
+    #Saves the data
+    if not os.path.exists(file.parent.joinpath(f'3d+intensity data')): #If folder does not exist, create it
+        os.makedirs(file.parent.joinpath(f'3d+intensity data'))
+    
+    filename = name+file.stem
+    savepath = file.parent.joinpath(f'3d+intensity data', filename + '.txt')
+    np.savetxt(savepath,np.transpose([x,y,z,I]))
+    
 #-------  Functions to fit plots to data -------
+def peak_distance(x,y,index_ref):
+    binsize = x[1]-x[0]
+    #Returns the distance between the highest peak in the histogram and a reference value that is measured seperatly.
+    height = np.amax(y)
+    return calcDistance(binsize*index_ref, binsize*np.where(y == height)[0][0]), height
+
 def FWHM(y, peak_index, binsize):
     peak = y[peak_index]
     half_peak = peak/2
@@ -212,18 +236,22 @@ def FWHM(y, peak_index, binsize):
     i = 1
     run_up, run_down = True, True
     while run_up or run_down:
-        upper = y[peak_index+i]
-        lower = y[peak_index-i]
+        try:
+            upper = y[peak_index+i]
+            lower = y[peak_index-i]
 
-        if upper <= half_peak and run_up:
-            r1 = peak_index + i
-            run_up = False
-            
-        if lower <= half_peak:
-            r2 = peak_index - i
-            run_down = False
+            if upper <= half_peak and run_up:
+                r1 = peak_index + i
+                run_up = False
+                
+            if lower <= half_peak:
+                r2 = peak_index - i
+                run_down = False
 
-        i+=1
+            i+=1
+
+        except IndexError:
+            return 25
 
     FW = (r1-r2)*binsize
     return FW
@@ -258,7 +286,7 @@ def gauss(x,y,ref):
     params = supermodel.make_params(amplitude=amp,
                                     center=center,
                                     sigma=sigma,
-                                    c=3)
+                                    c=5)
     
     result = supermodel.fit(y, params=params, x=x)
     sigma = result.params['sigma'].value
